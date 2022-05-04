@@ -10,7 +10,7 @@ public static class ContractToDomainMapper
             var mem = new MemoryStream(data.Length);
             mem.Write(span);
             mem.Position = 0;
-            return (span[0], ProtoBuf.Serializer.Deserialize<T>(mem));
+            return (data.Span[0], ProtoBuf.Serializer.Deserialize<T>(mem));
         }
         catch (Exception ex)
         {
