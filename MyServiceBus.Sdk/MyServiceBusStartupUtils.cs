@@ -11,7 +11,7 @@ public static class MyServiceBusStartupUtils
     public static MyServiceBusTcpClient Create(Func<string> getHostPort, ILogger logger, string appName)
     {
         var serviceBusClient = new MyServiceBusTcpClient(getHostPort, appName);
-        serviceBusClient.Log.AddLogException(ex => logger.LogInformation(ex, "Exception in MyServiceBusTcpClient"));
+        serviceBusClient.Log.AddLogException(ex => logger.LogError(ex, "Exception in MyServiceBusTcpClient"));
         serviceBusClient.Log.AddLogInfo(info => logger.LogDebug($"MyServiceBusTcpClient[info]: {info}"));
         serviceBusClient.SocketLogs.AddLogInfo((context, msg) =>
             logger.LogInformation(
