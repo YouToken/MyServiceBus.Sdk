@@ -27,7 +27,12 @@ public class MyServiceBusSubscriber<T> : IMyServiceBusSubscriber<T>, IMyServiceB
     private async ValueTask HandlerSingle(IMyServiceBusMessage data)
     {
         var (version, message) = data.Data.ByteArrayToServiceBusContract<T>();
-        var a = _list[version];
+
+        if (!_list.ContainsKey(version))
+        {
+            Console.WriteLine($"Subscriber not found for message: {Convert.ToBase64String(data.Data.ToArray())}. Contract version: {version}");
+            return;
+        }
 
         var subscribers = _list.ContainsKey(version) ? _list[version] : new List<Func<T, ValueTask>>(); 
         
