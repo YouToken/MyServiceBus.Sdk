@@ -9,9 +9,10 @@ public class MyServiceBusPublisher<T> : IServiceBusPublisher<T>
     private readonly MyServiceBusTcpClient _client;
     private readonly string _topicName;
     private readonly bool _immediatelyPersist;
-    private readonly byte _contractVersion;
+    private readonly byte? _contractVersion;
 
-    public MyServiceBusPublisher(MyServiceBusTcpClient client, string topicName, bool immediatelyPersist, byte contractVersion)
+    public MyServiceBusPublisher(MyServiceBusTcpClient client, string topicName, bool immediatelyPersist,
+        byte? contractVersion)
     {
         _client = client;
         _topicName = topicName;
@@ -21,12 +22,24 @@ public class MyServiceBusPublisher<T> : IServiceBusPublisher<T>
 
     public Task PublishAsync(T message)
     {
-        return _client.PublishAsync(_topicName, message.ServiceBusContractToByteArray(_contractVersion), _immediatelyPersist);
+        byte[] messToPublish = null;
+
+        messToPublish = _contractVersion == null
+            ? message.ServiceBusContractToByteArrayWithoutVersion()
+            : message.ServiceBusContractToByteArray(_contractVersion.Value);
+
+        return _client.PublishAsync(_topicName, messToPublish, _immediatelyPersist);
     }
 
     public Task PublishAsync(IEnumerable<T> messageList)
     {
-        var batch = messageList.Select(e => e.ServiceBusContractToByteArray(_contractVersion)).ToList();
+        var batch = messageList.Select(e =>
+        {
+            if (_contractVersion == null)
+                return e.ServiceBusContractToByteArrayWithoutVersion();
+
+            return e.ServiceBusContractToByteArray(_contractVersion.Value);
+        }).ToList();
         return _client.PublishAsync(_topicName, batch, _immediatelyPersist);
     }
 }

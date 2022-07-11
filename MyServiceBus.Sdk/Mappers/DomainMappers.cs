@@ -21,6 +21,21 @@ public static class ContractToDomainMapper
         }
     }
     
+    public static T ByteArrayToServiceBusContractWithoutVersion<T>(this ReadOnlyMemory<byte> data)
+    {
+        try
+        {
+            return ProtoBuf.Serializer.Deserialize<T>(data);
+        }
+        catch (Exception ex)
+        {
+            var dataBase64 = Convert.ToBase64String(data.ToArray());
+            Console.WriteLine($"Cannot deserialize message {typeof(T).Name}. Data: '{dataBase64}'");
+
+            throw new Exception($"Cannot deserialize message {typeof(T).Name}: {ex.Message}", ex);
+        }
+    }
+    
     public static byte[] ServiceBusContractToByteArray(this object src, byte contractVersion)
     {
         try
@@ -31,6 +46,22 @@ public static class ContractToDomainMapper
 
             ProtoBuf.Serializer.Serialize(stream, src);
 
+            var result = stream.ToArray();
+            
+            return result;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Cannot serialize {src.GetType().Name}: {ex.Message}", ex);
+        }
+    }
+    
+    public static byte[] ServiceBusContractToByteArrayWithoutVersion(this object src)
+    {
+        try
+        {
+            var stream = new MemoryStream();
+            ProtoBuf.Serializer.Serialize(stream, src);
             var result = stream.ToArray();
             
             return result;

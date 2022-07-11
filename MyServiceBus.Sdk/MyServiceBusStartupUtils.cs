@@ -65,4 +65,25 @@ public static class MyServiceBusStartupUtils
 
         return builder;
     }
+    
+    public static IServiceCollection RegisterMyServiceBusSubscriberSingleWithoutVersion<T>(this IServiceCollection builder,
+        MyServiceBusTcpClient client, string topicName, string queueName, TopicQueueType queryType)
+    {
+        builder
+            .AddSingleton<IMyServiceBusSubscriberWithoutVersion<T>>(new MyServiceBusSubscriberBatchWithoutVersion<T>(client, topicName, queueName,
+                queryType, false));
+
+        return builder;
+    }
+
+    public static IServiceCollection RegisterMyServiceBusSubscriberBatchWithoutVersion<T>(this IServiceCollection builder,
+        MyServiceBusTcpClient client, string topicName, string queueName, TopicQueueType queryType, int batchSize = 100)
+    {
+        // batch subscriber
+        builder
+            .AddSingleton<IMyServiceBusSubscriberWithoutVersion<IReadOnlyList<T>>>(
+                new MyServiceBusSubscriberBatchWithoutVersion<T>(client, topicName, queueName, queryType, true, batchSize));
+
+        return builder;
+    }
 }
