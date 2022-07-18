@@ -35,7 +35,7 @@ public static class MyServiceBusStartupUtils
     }
 
     public static IServiceCollection RegisterMyServiceBusPublisher<T>(this IServiceCollection builder,
-        MyServiceBusTcpClient client, string topicName, bool immediatelyPersist, byte contractVersion = 0)
+        MyServiceBusTcpClient client, string topicName, bool immediatelyPersist, byte? contractVersion = 0)
     {
         client.CreateTopicIfNotExists(topicName);
         builder
