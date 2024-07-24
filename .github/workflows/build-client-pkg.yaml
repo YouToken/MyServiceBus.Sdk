@@ -69,6 +69,9 @@ jobs:
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: 6.0.x
+          
+      - name: Update NuGet sources
+        run: dotnet nuget add source https://nuget.pkg.github.com/youtoken/index.json -n YouHodlerGitHub -u user -p ${{secrets.NUGET_GITHUB_TOKEN}} --store-password-in-clear-text
 
       - name: Build
         run: |
