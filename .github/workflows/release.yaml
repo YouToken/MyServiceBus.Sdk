@@ -1,25 +1,75 @@
-name: Release nuget
+name: Release sdk client library
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "*.*.*"
 
 jobs:
-  build:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 6.0.*
+
+      - name: Library Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Calculate VERSION
+        id: calculate-version
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "MAJOR_MINOR_PATCH=$(echo ${GITHUB_REF#refs/tags/} | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')" >> $GITHUB_OUTPUT
+
+      - name: Library Build
+        run: |
+          echo "Calculated VERSION: ${{ steps.calculate-version.outputs.MAJOR_MINOR_PATCH }}"
+          dotnet build --configuration Release /p:AssemblyVersion=${{ steps.calculate-version.outputs.MAJOR_MINOR_PATCH }}
+
+      - name: Library wrap
+        run: |
+          echo "Package VERSION: ${{ steps.calculate-version.outputs.TAG }}"
+          dotnet pack --configuration Release MyServiceBus.Sdk /p:PackageVersion=${{ steps.calculate-version.outputs.TAG }}
+
+      - name: Upload package to artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: package
+          path: MyServiceBus.Sdk/bin/Release/*.nupkg
+
+  upload-to-github-nuget:
+    needs: test-and-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: 6.0.*
-      - name: Build
-        run: dotnet build --configuration Release
-      - name: Test
-        run: dotnet test --configuration Release
+          dotnet-version: 6.0.x
+          source-url: https://nuget.pkg.github.com/youtoken/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Create the package - MyServiceBus.Sdk
-        run: dotnet pack --configuration Release MyServiceBus.Sdk/MyServiceBus.Sdk.csproj /p:Version=${GITHUB_REF#refs/tags/}
+      - name: Download builded library
+        uses: actions/download-artifact@v3
+        with:
+          name: package
+          path: Package
 
-      - name: Publish the package
-        run: dotnet nuget push MyServiceBus.Sdk/bin/Release/*.nupkg -s "https://api.nuget.org/v3/index.json" -k ${{ secrets.NUGET_TOCKEN }}
+      - name: ls
+        run: ls -la
+
+      - name: Publish the package to GitHub
+        uses: tanaka-takayoshi/nuget-publish-to-github-packages-action@v2.1
+        with:
+          nupkg-path: "./Package/*.nupkg"
+          repo-owner: 'YouToken'
+          gh-user: ${{ github.actor }}
+          token: ${{ secrets.NUGET_GITHUB_TOKEN }}
