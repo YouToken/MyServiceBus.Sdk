@@ -1,0 +1,117 @@
+name: Release sdk client library
+
+on:
+  push:
+    branches-ignore:
+      - "main"
+      - "master"
+
+env:
+  DOTNET_ROLL_FORWARD: Major
+  CLIENT_PROJ: MyServiceBus.Sdk
+  GIT_VERSION_CONFIG: ./build/GitVersion.yml
+
+jobs:
+
+  calculate_version:
+    runs-on: ubuntu-latest
+    outputs:
+      assemblyVersion: ${{ steps.gitversion.outputs.assemblySemVer }}
+      fileVersion: ${{ steps.gitversion.outputs.assemblySemFileVer }}
+      infoVersion: ${{ steps.gitversion.outputs.informationalVersion }}
+      pkgVersion: ${{ steps.pkg_calc.outputs.nugetPkgVersion }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.7
+        with:
+          versionSpec: '5.x'
+
+      - name: Calculate Total Commits
+        run: |
+          echo "TOTAL_COMMITS=$(git rev-list HEAD --count)" >> $GITHUB_ENV
+          echo "Total commits since start of the repo $TOTAL_COMMITS"
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v0.9.7
+        with:
+          useConfigFile: true
+          configFilePath: ${{ env.GIT_VERSION_CONFIG }}
+
+      - name: Calculate Package Version
+        id: pkg_calc
+        run: |
+          if [[ "${{ steps.gitversion.outputs.preReleaseLabel }}" == "" ]]; then
+            echo "nugetPkgVersion=${{ steps.gitversion.outputs.assemblySemFileVer }}" >> $GITHUB_OUTPUT
+          else 
+            echo "nugetPkgVersion=${{ steps.gitversion.outputs.assemblySemFileVer }}${{ steps.gitversion.outputs.PreReleaseLabelWithDash }}${{ github.run_number }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Print Versions
+        run: |
+          echo "Assembly version: ${{ steps.gitversion.outputs.assemblySemVer }}"
+          echo "File version: ${{ steps.gitversion.outputs.assemblySemFileVer }}"
+          echo "Info version: ${{ steps.gitversion.outputs.informationalVersion }}"
+          echo "NuGet package version: ${{ steps.pkg_calc.outputs.nugetPkgVersion }}"
+  create_artifacts:
+    runs-on: ubuntu-latest
+    needs: calculate_version
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 6.0.x
+          
+      - name: Update NuGet sources
+        run: dotnet nuget add source https://nuget.pkg.github.com/youtoken/index.json -n YouHodlerGitHub -u user -p ${{secrets.NUGET_GITHUB_TOKEN}} --store-password-in-clear-text
+
+      - name: Build
+        run: |
+          dotnet build --configuration Release /p:AssemblyVersion=${{ needs.calculate_version.outputs.assemblyVersion }} /p:FileVersion=${{ needs.calculate_version.outputs.fileVersion }} /p:InformationalVersion=${{ needs.calculate_version.outputs.infoVersion }}
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Library Packaging
+        run: |
+          echo "Create package ${{ env.CLIENT_PROJ }} with version ${{ needs.calculate_version.outputs.pkgVersion }}"
+          dotnet pack --configuration Release ${{ env.CLIENT_PROJ }} /p:PackageVersion=${{ needs.calculate_version.outputs.pkgVersion }}
+      - name: Upload package to artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: package
+          path: ${{ env.CLIENT_PROJ }}/bin/Release/*.nupkg
+
+  upload-to-nuget:
+    needs: create_artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Download built library
+        uses: actions/download-artifact@v3
+        with:
+          name: package
+          path: Package
+
+      - name: List Of Packages
+        run: ls -la
+
+      - name: Publish the package to GitHub
+        uses: tanaka-takayoshi/nuget-publish-to-github-packages-action@v2.1
+        with:
+          nupkg-path: "./Package/*.nupkg"
+          repo-owner: 'YouToken'
+          gh-user: ${{ github.actor }}
+          token: ${{ secrets.NUGET_GITHUB_TOKEN }}

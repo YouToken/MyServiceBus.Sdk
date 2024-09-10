@@ -1,0 +1,38 @@
+assembly-versioning-format: '{Major}.{Minor}' # do not brake backward compatibility
+assembly-file-versioning-format: '{Major}.{Minor}.{Patch}'
+assembly-informational-format: '{Major}.{Minor}.{Patch}.+{ShortSha}_BRANCH.{BranchName}'
+branches:
+  release:
+    tag: beta
+    is-release-branch: true
+    # for RC branches : releases/v[number]
+    # the same as default config
+    # in the command line write : dotnet gitversion /showconfig
+
+  feature:
+    tag: useBranchName
+    increment: Minor
+    mode: ContinuousDelivery
+    regex: ^features?[/-]
+    pre-release-weight: 30000
+  
+  bugfix:
+    regex: ^bugfix[/_-]
+    source-branches: ['master']
+    increment: Patch
+
+  test:
+    tag: useBranchName
+    increment: None
+    mode: ContinuousDelivery
+    regex: ^tests?[/-]
+    source-branches: ['main']
+    pre-release-weight: 30000
+
+  main:
+    regex: ^(main|master)$
+    increment: None
+
+ignore:
+  sha: []
+merge-message-formats: {}
